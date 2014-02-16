@@ -1,132 +1,41 @@
-# encoding: utf-8
-require 'net/http'
-require 'kconv'
-require 'nokogiri'
-require 'csv'
+【注意事項】
+ぐるなびの仕様変更によっては利用できなくなる可能性があります。
 
-# 第一引数が対象年(YYYY)
-# 第二引数が対象月(MM)
-# 認証情報 ['店名', 'id', 'password']
-year = ARGV[0]
-month = ARGV[1]auth = []
+【環境構築】
+1. ファイルを設置 
+	・gnavi.rb をCドライブ直下に移動
+			C:\gnavi\gnavi.rb
 
+2. 実行環境構築用意
+	http://rubyinstaller.org/
+	上記より Ruby 2.0.0-p353 をダウンロード、インストール実行
 
-###################
-# 関数群
-###################
+3. 必要なツールの導入
+　・windowsキー + R を押下
+　・cmdと入力、確定
+　・立ち上がったウィンドウに下記を入力してエンターキーを押下
+			gem install nokogiri
 
-# ログインを実行し、cookie情報を返却
-def login(id, passwd) 
-	# ログイン実施、セッション確立
-	con = Net::HTTP.new 'pro.gnavi.co.jp'
-	uri = '/bp/auth/login.php?id=' + id + '&pass=' + passwd + '&logintype=1'
-	res = con.get uri
+【使い方】
+1. 実行
+　・環境構築3.で起動したウィンドウに書きコマンドを入力してエンターキーを押下
+			ruby c:\gnavi\gnavi.rb yyyy mm
 
-	# クッキー一覧取得
-	cookies = {}
-	if res.key? 'set-cookie'           # set-cookieフィールドがある?
-	  res.get_fields('set-cookie').each { |c|
-	    c =~ /(.+?)=(.+?)[;\s$]/
-	    cookies[$1] = $2 if $1
-	  }
-	end
+		※yyyyには取得したい西暦年を、mmには月を入力
+			例) ruby c:\gnavi\gnavi.rb 2014 01
 
-	# リクエストヘッダにクッキー追加
-	h = {}
-	if cookies
-	  h['cookie'] = cookies.map { |k, v|
-	    "#{k}=#{v}"
-	  }.join('; ')
-	end
-
-	return h
-end
+2. 待つ
+　画面を見つつまったり待ちましょう。
+	自動的にツールが収集を行い、Cドライブ直下にyyyymm.csvというファイルを作成します。
+			例) c:\gnavi\201401.csv
 
 
-# 実際のデータ取得を実施
-def scrape(h, year, month)
-	# 取得データ格納先
-	dates = []
-	prices = []
+※1~3については一度実行すれば以後必要ありません。
 
-	# データ取得
-	con = Net::HTTP.new 'manage.gnavi.co.jp'
-	uri = '/newtouch/receipt/statement/touch_m.php?year=' + year + '&month=' + month
-	res = con.get uri, h
-	root = Nokogiri::HTML res.body.toutf8
+【お店の追加方法】
+設定はすべてgnavi.rb内に記述されています。
+12行目以降が設定になっているので、同じ書式で
 
-	# テーブル取得
-	if root && root.xpath('//table')[3] then
-		# テーブル要素取得
-		root.xpath('//table')[3].xpath('.//tr').each { |i|
-			# 日付部取得
-			if i.xpath('.//td')[0] && i.xpath('.//td')[0].xpath('.//a') then
-				raw_date = i.xpath('.//td')[0].xpath('.//a').inner_text
-				dates << raw_date.gsub(/\([月火水木金土日]\)/, '')
-			end
+　店舗名、ぐるなびid、パスワード
 
-			# 決済額取得
-			if i.xpath('.//td')[3] then
-				raw_price = i.xpath('.//td')[2].inner_text
-				prices << raw_price.gsub(/["\-,]/, '')
-			end
-		}
-
-		# 総計挿入
-		dates << "中旬合計"
-		prices << prices[0..14].inject { |sum, i| sum.to_i + i.to_i }
-
-		dates << "月末合計"
-		prices << prices[15..-2].inject { |sum, i| sum.to_i + i.to_i }
-	end
-
-	return {'dates' => dates, 'prices' => prices}
-end
-
-
-# 実行メソッド
-def exec(id, passwd, year, month)
-	h = login(id, passwd)
-	return scrape(h, year, month)
-end
-
-
-###################
-# メイン処理
-###################
-
-# CSV出力準備
-path = ARGV.shift
-file_name = year + month + '.csv'
-new_csv = File.join(File.dirname(path), file_name)
-
-# CSV書き込み開始
-CSV.open(new_csv, "wb") do |csv|
-	is_first = true
-	auth.each{|shop|
-		# コンソール出力
-		puts "getting " + shop[0] + "..."
-
-		# 変数準備
-		shop_name = shop[0].encode("Shift_JIS", :undef => :replace, :replace => "")
-		id = shop[1]
-		passwd = shop[2]
-
-		# データ取得
-		res = exec(shop[1], shop[2], year, month)
-
-		# 初回のみヘッダー出力
-		if is_first then
-			is_first = false
-
-			row = [''].concat(res['dates'])
-			encoded_row = []
-			row.each { |item| encoded_row << item.strip.encode("Shift_JIS", :undef => :replace, :replace => "")}
-			csv << encoded_row
-		end
-
-		# 店舗情報出力
-		row = [shop_name].concat(res['prices'])
-		csv << row
-	}
-end
+の順で追記を行えば自動的に対応可能です。

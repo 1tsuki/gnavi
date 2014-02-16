@@ -8,8 +8,8 @@ require 'csv'
 # 第二引数が対象月(MM)
 # 認証情報 ['店名', 'id', 'password']
 year = ARGV[0]
-month = ARGV[1]auth = []
-
+month = ARGV[1]
+auth = []
 
 ###################
 # 関数群
